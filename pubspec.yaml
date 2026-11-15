@@ -43,6 +43,9 @@ dependencies:
   provider: ^6.1.5+1
   intl: ^0.20.3
   shared_preferences: ^2.5.6
+  sherpa_onnx: ^2.0.1
+  audioplayers: ^6.8.1
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
@@ -62,6 +65,9 @@ dev_dependencies:
 flutter:
   assets:
     - assets/avatar/
+    # Voz neural da pera (Supertonic 3, OpenRAIL-M). Só no app nativo; a web usa a voz do navegador.
+    - path: assets/voice/supertonic3/
+      platforms: [ios, android, macos]
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

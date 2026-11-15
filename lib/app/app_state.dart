@@ -15,6 +15,7 @@ class AppState extends ChangeNotifier {
   AppState(this._prefs, this.voice, this.pear) {
     lang = _prefs.getString('lang') ?? 'pt';
     cc = _prefs.getBool('cc') ?? false;
+    voice.setMuted(_prefs.getBool('muted') ?? false);
     voice.configure(lang, 'f');
     _sub = sb.auth.onAuthStateChange.listen((d) => _onAuth(d.session));
     _onAuth(sb.auth.currentSession);
@@ -110,6 +111,14 @@ class AppState extends ChangeNotifier {
   void toggleCc() {
     cc = !cc;
     _prefs.setBool('cc', cc);
+    notifyListeners();
+  }
+
+  bool get muted => voice.muted.value;
+
+  void toggleMute() {
+    voice.setMuted(!muted);
+    _prefs.setBool('muted', muted);
     notifyListeners();
   }
 

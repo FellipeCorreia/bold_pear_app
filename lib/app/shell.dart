@@ -110,6 +110,12 @@ class _TopBar extends StatelessWidget {
           ]),
         ),
         IconButton(
+          tooltip: t.ui(app.muted ? 'unmute' : 'mute'),
+          onPressed: app.toggleMute,
+          icon: Icon(app.muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+              color: app.muted ? PiCores.laranja : PiCores.textoSuave),
+        ),
+        IconButton(
           tooltip: t.ui('subtitles'),
           onPressed: app.toggleCc,
           icon: Icon(app.cc ? Icons.closed_caption : Icons.closed_caption_off_outlined,

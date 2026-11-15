@@ -1,23 +1,40 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 import '../../core/i18n/l10n.dart';
 import '../avatar/pear_controller.dart';
+import 'neural/neural_voice.dart';
 
-/// Voz da Bold Pear (TTS do sistema no protótipo; áudios neurais na versão final).
-/// Controla a boca da pera e as legendas.
+/// Voz da Bold Pear: voz neural offline (Supertonic 3) quando o pacote está instalado,
+/// senão o TTS do sistema. Controla a boca da pera, as legendas e o modo silencioso.
 class VoiceService {
   VoiceService(this.pear) {
     _tts.setStartHandler(() => pear.set(talking: true));
     _tts.setCompletionHandler(() => pear.set(talking: false));
     _tts.setCancelHandler(() => pear.set(talking: false));
     _tts.setErrorHandler((_) => pear.set(talking: false));
+    // Voz e efeitos da pera tocam juntos, sem interromper a música de quem estiver ouvindo.
+    AudioPlayer.global
+        .setAudioContext(AudioContextConfig(focus: AudioContextConfigFocus.mixWithOthers).build())
+        .catchError((_) {});
+    _player.onPlayerComplete.listen((_) => _finishPlayback());
+    _player.onLog.listen((_) {}, onError: (Object e) {
+      debugPrint('VoiceService player error: $e');
+      _finishPlayback();
+    });
+    neural.status.addListener(() {
+      if (neural.ready) noVoice.value = false;
+    });
+    neural.init();
   }
 
   final PearController pear;
   final FlutterTts _tts = FlutterTts();
+  final AudioPlayer _player = AudioPlayer(playerId: 'pear-voice');
+  final NeuralVoice neural = NeuralVoice();
 
   final ValueNotifier<String> subtitle = ValueNotifier('');
 
@@ -25,9 +42,13 @@ class VoiceService {
   final ValueNotifier<bool> noVoice = ValueNotifier(false);
 
   String _lang = 'pt';
+  /// Voz da pera silenciada pelo usuário: ela "fala" só pelas legendas.
+  final ValueNotifier<bool> muted = ValueNotifier(false);
+
   String _gender = 'f';
   double _pitch = 1.2;
   int _tok = 0;
+  Completer<void>? _playing;
 
   static final _fem = RegExp(
       r'(female|luciana|francisca|thalita|vit[oó]ria|maria|raquel|fernanda|leticia|samantha|victoria|karen|zira|aria|jenny|susan|allison|ava\b|serena|tessa|moira|anna|petra|katja|hedda|marlene|vicki|am[eé]lie|audrey|aur[eé]lie|denise|julie|marie|c[eé]line|virginie|kyoko|haruka|ayumi|nanami|mizuki|sayaka)',
@@ -51,7 +72,7 @@ class VoiceService {
           .where((v) => v['locale']!.toLowerCase().replaceAll('_', '-').startsWith(lang))
           .toList();
       if (voices.isEmpty) {
-        noVoice.value = true;
+        noVoice.value = !neural.ready;
         return;
       }
       noVoice.value = false;
@@ -77,7 +98,7 @@ class VoiceService {
       await _tts.setPitch(_pitch);
       if (best != null) await _tts.setVoice(best);
     } catch (_) {
-      noVoice.value = true;
+      noVoice.value = !neural.ready;
     }
   }
 
@@ -104,28 +125,84 @@ class VoiceService {
     final my = ++_tok;
     if (expr != null) pear.set(expr: expr);
     subtitle.value = text;
-    await _tts.stop();
+    await _halt();
     if (my != _tok) return;
-    if (noVoice.value) {
-      pear.set(talking: true);
-      await Future<void>.delayed(Duration(milliseconds: _estimateMs(text)));
-      if (my == _tok) {
-        pear.set(talking: false);
-        _clearSubtitleLater(my);
-      }
-      return;
-    }
-    for (final c in _chunks(text)) {
-      if (my != _tok) return;
-      pear.set(talking: true);
-      try {
-        await _tts.speak(c).timeout(Duration(milliseconds: _estimateMs(c) + 4000));
-      } catch (_) {}
+    if (muted.value || (noVoice.value && !neural.ready)) {
+      await _mime(text);
+    } else if (!neural.ready || !await _sayNeural(text, my)) {
+      if (my == _tok) await _saySystem(text, my);
     }
     if (my == _tok) {
       pear.set(talking: false);
       _clearSubtitleLater(my);
     }
+  }
+
+  /// Boca se mexe pelo tempo estimado da fala, sem som.
+  Future<void> _mime(String text) async {
+    pear.set(talking: true);
+    await Future<void>.delayed(Duration(milliseconds: _estimateMs(text)));
+  }
+
+  Future<void> _saySystem(String text, int my) async {
+    final cs = _chunks(text);
+    for (var i = 0; i < cs.length; i++) {
+      if (my != _tok) return;
+      if (muted.value) return _mime(cs.skip(i).join(' '));
+      pear.set(talking: true);
+      try {
+        await _tts.speak(cs[i]).timeout(Duration(milliseconds: _estimateMs(cs[i]) + 4000));
+      } catch (_) {}
+    }
+  }
+
+  /// Voz neural frase a frase: enquanto uma toca, a próxima já está sendo gerada.
+  /// Devolve false se a primeira frase falhar (aí cai no TTS do sistema).
+  Future<bool> _sayNeural(String text, int my) async {
+    final chunks = _chunks(text);
+    Future<String?> gen(int i) => neural.synth(chunks[i], lang: _lang, gender: _gender);
+    var next = gen(0);
+    for (var i = 0; i < chunks.length; i++) {
+      final path = await next;
+      if (i + 1 < chunks.length) next = gen(i + 1);
+      if (my != _tok || muted.value) {
+        if (path != null) neural.discard(path);
+        if (my == _tok) await _mime(chunks.skip(i).join(' '));
+        return true;
+      }
+      if (path == null) {
+        if (i == 0) return false;
+        continue;
+      }
+      pear.set(talking: true);
+      await _play(path);
+      neural.discard(path);
+    }
+    return true;
+  }
+
+  Future<void> _play(String path) async {
+    final done = _playing = Completer<void>();
+    try {
+      await _player.play(DeviceFileSource(path));
+      await done.future.timeout(const Duration(seconds: 40));
+    } catch (e) {
+      debugPrint('VoiceService play failed: $e');
+      _finishPlayback();
+    }
+  }
+
+  void _finishPlayback() {
+    final p = _playing;
+    if (p != null && !p.isCompleted) p.complete();
+  }
+
+  Future<void> _halt() async {
+    _finishPlayback();
+    try {
+      await _player.stop();
+    } catch (_) {}
+    await _tts.stop();
   }
 
   /// A legenda some alguns segundos depois da fala, para não ficar "presa" em outra tela.
@@ -135,11 +212,22 @@ class VoiceService {
     });
   }
 
+  /// Silencia (ou devolve) a voz. A fala atual continua só nas legendas.
+  void setMuted(bool v) {
+    if (muted.value == v) return;
+    muted.value = v;
+    if (v) {
+      _finishPlayback();
+      _player.stop().catchError((_) {});
+      _tts.stop();
+    }
+  }
+
   Future<void> stop() async {
     _tok++;
     subtitle.value = '';
     pear.set(talking: false);
-    await _tts.stop();
+    await _halt();
   }
 
   String get gender => _gender;
