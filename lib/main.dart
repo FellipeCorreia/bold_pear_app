@@ -10,6 +10,7 @@ import 'core/config/env.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/space_background.dart';
 import 'features/avatar/pear_controller.dart';
+import 'features/avatar/pear_touch.dart';
 import 'features/checkin/presentation/checkin_controller.dart';
 import 'features/voice/voice_service.dart';
 
@@ -28,6 +29,7 @@ Future<void> main() async {
       ChangeNotifierProvider.value(value: app),
       ChangeNotifierProvider.value(value: pear),
       Provider.value(value: SkyController()),
+      Provider.value(value: PearTouch(pear, voice)),
       ChangeNotifierProvider(create: (_) => CheckinController(app)),
     ],
     child: BoldPearApp(app: app),

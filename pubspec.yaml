@@ -65,6 +65,7 @@ dev_dependencies:
 flutter:
   assets:
     - assets/avatar/
+    - assets/sfx/
     # Voz neural da pera (Supertonic 3, OpenRAIL-M). Só no app nativo; a web usa a voz do navegador.
     - path: assets/voice/supertonic3/
       platforms: [ios, android, macos]

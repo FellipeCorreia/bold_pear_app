@@ -6,6 +6,7 @@ import '../core/theme/pi_cores.dart';
 import '../core/widgets/space_background.dart';
 import '../core/widgets/ui.dart';
 import '../features/avatar/pear_controller.dart';
+import '../features/avatar/pear_touch.dart';
 import '../features/avatar/pear_view.dart';
 import 'app_state.dart';
 
@@ -59,12 +60,27 @@ class _PearStage extends StatelessWidget {
     final app = context.read<AppState>();
     final pear = context.read<PearController>();
     return Column(mainAxisSize: MainAxisSize.min, children: [
-      AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-        width: size,
-        height: size,
-        child: PearView(controller: pear),
+      // Tocar na pera: ela reage (pulo, giro, risadinha...) com som.
+      Semantics(
+        button: true,
+        label: 'Bold Pear',
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: context.read<PearTouch>().tap,
+            // Arrastos em cima da pera não rolam nada (nem a WebView nativa por baixo).
+            onVerticalDragUpdate: (_) {},
+            onHorizontalDragUpdate: (_) {},
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+              width: size,
+              height: size,
+              child: PearView(controller: pear),
+            ),
+          ),
+        ),
       ),
       ValueListenableBuilder<bool>(
         valueListenable: app.voice.noVoice,
