@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bold Pear avatar</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg,#2c2c30)}
+.wrap{position:absolute;inset:0;display:grid;place-items:center}
+.stage{position:relative;width:min(84vw,84vh);aspect-ratio:1}
+.badge{position:absolute;inset:0;border-radius:50%;background:linear-gradient(160deg,#ffb23d,#ee8a1a);padding:4.4%;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+.ring{height:100%;border-radius:50%;padding:3.4%;background:linear-gradient(160deg,#dcdfe3,#7f848b);box-sizing:border-box}
+.space{position:relative;height:100%;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 38% 30%,#183058,#0b1730 55%,#070d1f);box-shadow:inset 0 6px 20px rgba(0,0,0,.6)}
+.badge,.ring,.space{box-sizing:border-box}
+.space svg{position:absolute;inset:0;width:100%;height:100%}
+.tw{animation:tw 3.2s ease-in-out infinite}
+@keyframes tw{50%{opacity:.25}}
+canvas{position:absolute;left:-14%;top:-16%;width:128%;height:128%}
+@media(prefers-reduced-motion:reduce){.tw{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="stage" id="stage"><div class="badge"><div class="ring"><div class="space" id="space"></div></div></div><canvas id="pear"></canvas></div></div>
+<script src="three.min.js"></script>
+<script>
+{
+const q=new URLSearchParams(location.search);if(q.get('bg'))document.documentElement.style.setProperty('--bg','#'+q.get('bg'));
+let s='<svg viewBox="0 0 100 100" aria-hidden="true">';let seed=7;const rnd=()=>((seed=(seed*9301+49297)%233280)/233280);
+for(let i=0;i<70;i++){s+=`<circle cx="${(rnd()*100).toFixed(1)}" cy="${(rnd()*100).toFixed(1)}" r="${(.15+rnd()*.45).toFixed(2)}" fill="${rnd()<.25?'#7fb0ff':'#fff'}" opacity="${(.35+rnd()*.6).toFixed(2)}"/>`}
+const sp4='M0,-3 L.55,-.55 L3,0 L.55,.55 L0,3 L-.55,.55 L-3,0 L-.55,-.55Z';
+[[22,30,1],[78,26,.8],[16,62,.9],[84,58,.7],[30,82,.6],[70,84,.75],[52,12,.55]].forEach(([x,y,k],i)=>{s+=`<path class="tw" style="animation-delay:${i*.45}s" d="${sp4}" transform="translate(${x} ${y}) scale(${k})" fill="${i%3?'#fff':'#9fd0ff'}"/>`});
+document.getElementById('space').innerHTML=s+'</svg>';
+
+const st={expr:'neutral',talking:false,gender:'f',breath:1};
+const P={talk:0,breath:1};
+window.pear={set(o){if(o&&typeof o==='object')Object.assign(st,o);if(P.gender)P.gender(st.gender==='f')}};
+window.addEventListener('message',e=>{let d=e.data;if(typeof d==='string'){try{d=JSON.parse(d)}catch(_){return}}if(d&&d.pear)window.pear.set(d.pear)});
+
+try{
+  const T=THREE,cv=document.getElementById('pear');
+  const R=new T.WebGLRenderer({canvas:cv,alpha:true,antialias:true});R.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  const scene=new T.Scene(),cam=new T.PerspectiveCamera(28,1,.1,50);cam.position.set(0,.3,8.2);cam.lookAt(0,.22,0);
+  scene.add(new T.HemisphereLight(0xffffff,0x1a2340,.5));
+  const key=new T.DirectionalLight(0xfff3dc,.8);key.position.set(-3,4,5);scene.add(key);
+  const rim=new T.DirectionalLight(0xf7a128,.9);rim.position.set(3.5,1.5,-4);scene.add(rim);
+  const fill=new T.DirectionalLight(0x8fb8ff,.35);fill.position.set(4,-1,3);scene.add(fill);
+  const prof=[[0,-1.2],[.5,-1.15],[.88,-.95],[1.06,-.6],[1.08,-.25],[.98,.12],[.8,.45],[.64,.78],[.56,1.05],[.48,1.3],[.32,1.5],[.12,1.6],[0,1.62]];
+  const pts=new T.SplineCurve(prof.map(p=>new T.Vector2(p[0],p[1]))).getPoints(90);pts[0].x=0;pts[pts.length-1].x=0;
+  const rAt=y=>{for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];if(y>=a.y&&y<=b.y)return a.x+(b.x-a.x)*((y-a.y)/((b.y-a.y)||1))}return 0};
+  const tc=document.createElement('canvas');tc.width=512;tc.height=512;const g=tc.getContext('2d');
+  const gr=g.createLinearGradient(0,0,0,512);gr.addColorStop(0,'#9aa90c');gr.addColorStop(.45,'#b3bb12');gr.addColorStop(1,'#7f900a');g.fillStyle=gr;g.fillRect(0,0,512,512);
+  for(let i=0;i<1100;i++){g.fillStyle=Math.random()<.8?'rgba(110,135,10,.38)':'rgba(235,240,120,.3)';g.beginPath();g.ellipse(Math.random()*512,Math.random()*512,.6+Math.random()*1.6,.8+Math.random()*2.2,0,0,7);g.fill()}
+  const pear=new T.Group(),root=new T.Group();root.add(pear);scene.add(root);
+  pear.add(new T.Mesh(new T.LatheGeometry(pts,80,Math.PI,Math.PI*2),new T.MeshStandardMaterial({map:new T.CanvasTexture(tc),roughness:.38,metalness:0})));
+  const face=new T.Group();pear.add(face);
+  const place=(o,y,th,off)=>{const r=rAt(y)+off;o.position.set(r*Math.sin(th),y,r*Math.cos(th));o.lookAt(Math.sin(th)*20,y,Math.cos(th)*20);face.add(o);return o};
+  const black=new T.MeshStandardMaterial({color:0x111111,roughness:.25});
+  const eyes=[],lashes=[],brows=[],cheeks=[];
+  [-1,1].forEach(s=>{
+    const e=new T.Group(),ball=new T.Mesh(new T.SphereGeometry(.095,24,16),black);ball.scale.z=.45;e.add(ball);
+    const hl=new T.Mesh(new T.SphereGeometry(.032,12,8),new T.MeshBasicMaterial({color:0xffffff}));hl.position.set(.03,.035,.04);e.add(hl);
+    const lg=new T.Group();(s>0?[.35,.75,1.15]:[Math.PI-.35,Math.PI-.75,Math.PI-1.15]).forEach(a=>{const l=new T.Mesh(new T.CylinderGeometry(.009,.009,.06,6),black);l.position.set(Math.cos(a)*.115,Math.sin(a)*.115,0);l.rotation.z=a-Math.PI/2;lg.add(l)});e.add(lg);lashes.push(lg);
+    place(e,-.02,s*.3,.012);eyes.push(e);
+    const bh=new T.Group(),bm=new T.Mesh(new T.CylinderGeometry(.012,.012,.13,8),black);bm.rotation.z=Math.PI/2;bh.add(bm);bh.visible=false;bh.userData.s=s;place(bh,.16,s*.3,.012);brows.push(bh);
+    const ch=new T.Mesh(new T.CircleGeometry(.1,32),new T.MeshBasicMaterial({color:0xf97831,transparent:true,opacity:.8,depthWrite:false}));ch.scale.x=1.35;place(ch,-.17,s*.56,.014);cheeks.push(ch);
+  });
+  const mp=[];for(let k=0;k<=24;k++){const x=-.085+.17*k/24;mp.push(new T.Vector3(x,-.028*Math.abs(Math.sin(Math.PI*(x+.085)/.085)),0))}
+  const mIdle=place(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(mp),40,.013,8,false),black),-.19,0,.014);
+  const mOpen=new T.Group();mOpen.add(new T.Mesh(new T.SphereGeometry(.075,24,16),new T.MeshStandardMaterial({color:0x4a1d14,roughness:.6})));
+  const tongue=new T.Mesh(new T.SphereGeometry(.045,16,10),new T.MeshStandardMaterial({color:0xf07f6e,roughness:.6}));tongue.position.set(0,-.03,.012);tongue.scale.set(1,.55,.4);mOpen.add(tongue);
+  place(mOpen,-.2,0,0);mOpen.visible=false;
+  pear.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([new T.Vector3(0,1.5,0),new T.Vector3(.02,1.72,0),new T.Vector3(.11,1.9,.02)]),20,.05,8,false),new T.MeshStandardMaterial({color:0x7b4a25,roughness:.8})));
+  const ls=new T.Shape();ls.moveTo(0,0);ls.bezierCurveTo(.15,.2,.48,.24,.74,0);ls.bezierCurveTo(.48,-.2,.15,-.17,0,0);
+  const leafP=new T.Group();leafP.position.set(.1,1.86,.02);leafP.rotation.set(.25,-.45,.35);
+  leafP.add(new T.Mesh(new T.ShapeGeometry(ls,24),new T.MeshStandardMaterial({color:0x87a00b,side:T.DoubleSide,roughness:.5})));
+  leafP.add(new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(.02,0,.004),new T.Vector3(.66,0,.004)]),new T.LineBasicMaterial({color:0x5b7408})));
+  pear.add(leafP);
+  const bow=new T.Group(),org=new T.MeshStandardMaterial({color:0xf7a128,roughness:.5});
+  const c1=new T.Mesh(new T.ConeGeometry(.08,.17,16),org);c1.rotation.z=-Math.PI/2;c1.position.x=-.085;
+  const c2=new T.Mesh(new T.ConeGeometry(.08,.17,16),org);c2.rotation.z=Math.PI/2;c2.position.x=.085;
+  bow.add(c1,c2,new T.Mesh(new T.SphereGeometry(.04,12,8),new T.MeshStandardMaterial({color:0xe0861a})));
+  bow.scale.setScalar(1.35);place(bow,1.12,-.38,.04);
+  P.gender=f=>{lashes.forEach(l=>l.visible=!!f);bow.visible=!!f};P.gender(st.gender==='f');
+  const fit=()=>{const w=cv.clientWidth,h=cv.clientHeight;if(!w)return;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()};
+  new ResizeObserver(fit).observe(cv);fit();
+  const calm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let last=performance.now(),t=0,blinkAt=2,blinkUntil=0;
+  const loop=now=>{
+    requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;
+    const k=calm?.3:1,happy=st.expr==='happy',con=st.expr==='concern';
+    root.position.y=(.05*Math.sin(t*1.6)+(happy?.03*Math.abs(Math.sin(t*5)):0))*k;
+    root.rotation.y=.16*Math.sin(t*.5)*k;root.rotation.z=(con?.06:0)+.035*Math.sin(t*.8)*k;
+    P.breath+=((st.breath||1)-P.breath)*Math.min(1,dt*1.1);pear.scale.setScalar(.78*P.breath);
+    leafP.rotation.z=.35+.07*Math.sin(t*2)*k;
+    if(t>blinkAt){blinkUntil=t+.13;blinkAt=t+2.2+Math.random()*3}
+    const ey=t<blinkUntil?.12:(happy?.82:1);eyes.forEach(e=>e.scale.y+=(ey-e.scale.y)*.5);
+    brows.forEach(b=>{b.visible=con;b.rotation.z=-b.userData.s*.4});
+    const co=happy?.95:con?.45:.78;cheeks.forEach(c=>c.material.opacity+=(co-c.material.opacity)*.1);
+    const target=st.talking?.25+.75*Math.abs(Math.sin(t*13)*Math.sin(t*7.7+1.3)):0;P.talk+=(target-P.talk)*.35;
+    if(P.talk>.06){mOpen.visible=true;mIdle.visible=false;mOpen.scale.set(.9+.2*P.talk,.12+.8*P.talk,.35)}else{mOpen.visible=false;mIdle.visible=true}
+    R.render(scene,cam);
+  };
+  requestAnimationFrame(loop);
+}catch(e){}
+}
+</script>
+</body>
+</html>
