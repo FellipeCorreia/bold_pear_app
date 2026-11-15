@@ -26,8 +26,10 @@ class _PearViewState extends State<PearView> {
     super.initState();
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int id) {
       final f = web.HTMLIFrameElement()
-        ..src = 'assets/assets/avatar/index.html?bg=2c2c30'
+        ..src = 'assets/assets/avatar/index.html'
         ..style.border = '0'
+        ..style.background = 'transparent'
+        ..setAttribute('allowtransparency', 'true')
         ..style.width = '100%'
         ..style.height = '100%'
         ..style.pointerEvents = 'none';

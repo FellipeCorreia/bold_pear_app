@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/pi_cores.dart';
+import '../core/widgets/space_background.dart';
 import '../core/widgets/ui.dart';
 import '../features/avatar/pear_controller.dart';
 import '../features/avatar/pear_view.dart';
@@ -20,26 +21,31 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final compact = _compact.contains(location);
-    return Scaffold(
-      body: SafeArea(
-        child: Column(children: [
-          _TopBar(location: location),
-          Expanded(
-            child: LayoutBuilder(builder: (context, c) {
-              final wide = c.maxWidth >= 900;
-              final pear = _PearStage(size: wide ? 380 : (compact ? 150 : 240), showSubtitles: app.cc);
-              if (wide) {
-                return Row(children: [
-                  Expanded(flex: 5, child: Center(child: SingleChildScrollView(child: pear))),
-                  Expanded(flex: 6, child: child),
-                ]);
-              }
-              return Column(children: [pear, Expanded(child: child)]);
-            }),
-          ),
-        ]),
+    return Stack(children: [
+      // Céu estrelado vivo atrás de todas as telas.
+      Positioned.fill(child: SpaceBackground(sky: context.read<SkyController>(), location: location)),
+      Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Column(children: [
+            _TopBar(location: location),
+            Expanded(
+              child: LayoutBuilder(builder: (context, c) {
+                final wide = c.maxWidth >= 900;
+                final pear = _PearStage(size: wide ? 380 : (compact ? 150 : 240), showSubtitles: app.cc || app.muted);
+                if (wide) {
+                  return Row(children: [
+                    Expanded(flex: 5, child: Center(child: SingleChildScrollView(child: pear))),
+                    Expanded(flex: 6, child: child),
+                  ]);
+                }
+                return Column(children: [pear, Expanded(child: child)]);
+              }),
+            ),
+          ]),
+        ),
       ),
-    );
+    ]);
   }
 }
 

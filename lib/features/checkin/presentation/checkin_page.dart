@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../app/app_state.dart';
 import '../../../core/theme/pi_cores.dart';
+import '../../../core/widgets/space_background.dart';
 import '../../../core/widgets/ui.dart';
 import '../../avatar/pear_controller.dart';
 import 'checkin_controller.dart';
@@ -60,7 +61,10 @@ class _CheckinPageState extends State<CheckinPage> {
       onKeyEvent: (e) {
         if (e is! KeyDownEvent) return;
         final k = int.tryParse(e.character ?? '');
-        if (k != null && k >= 1 && k <= q.options.length) c.answer(k - 1);
+        if (k != null && k >= 1 && k <= q.options.length && !c.busy) {
+          context.read<SkyController>().travel();
+          c.answer(k - 1);
+        }
       },
       child: PageBody(children: [
         Row(children: [
@@ -96,7 +100,10 @@ class _CheckinPageState extends State<CheckinPage> {
             badge: '${k + 1}',
             label: q.options[k],
             enabled: !c.busy,
-            onTap: () => c.answer(k),
+            onTap: () {
+              context.read<SkyController>().travel();
+              c.answer(k);
+            },
           ),
         const SizedBox(height: 6),
         Align(
