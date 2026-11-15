@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/i18n/l10n.dart';
+import '../features/admin/data/admin_repository.dart';
 import '../features/avatar/pear_controller.dart';
 import '../features/profile/data/profile_repository.dart';
 import '../features/profile/domain/profile.dart';
@@ -34,6 +35,9 @@ class AppState extends ChangeNotifier {
   late String lang;
   bool cc = true;
   bool greeted = false;
+
+  /// Conta da equipe NASA (tabela public.admins): vê o painel em vez do check-in.
+  bool isAdmin = false;
   int _authTok = 0;
 
   bool get loggedIn => session != null;
@@ -51,6 +55,7 @@ class AppState extends ChangeNotifier {
     session = s;
     if (s == null) {
       profile = null;
+      isAdmin = false;
       greeted = false;
       ready = true;
       notifyListeners();
@@ -59,9 +64,15 @@ class AppState extends ChangeNotifier {
     if (sameUser) return;
     profile = null;
     notifyListeners();
+    isAdmin = false;
     try {
-      final p = await _profiles.fetchOrCreate(s.user, language: lang);
+      final results = await Future.wait([
+        _profiles.fetchOrCreate(s.user, language: lang),
+        AdminRepository(sb).isAdmin(),
+      ]);
       if (my != _authTok) return;
+      final p = results[0] as Profile;
+      isAdmin = results[1] as bool;
       profile = p;
       if (p.onboarded) {
         lang = p.language;

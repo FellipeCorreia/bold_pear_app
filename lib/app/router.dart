@@ -1,6 +1,8 @@
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../features/admin/presentation/admin_dashboard_page.dart';
+import '../features/admin/presentation/admin_user_page.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/signup_page.dart';
 import '../features/auth/presentation/welcome_page.dart';
@@ -26,11 +28,26 @@ GoRouter buildRouter(AppState app) {
       if (!app.loggedIn) return public.contains(loc) ? null : '/welcome';
       final p = app.profile;
       if (p == null) return loc == '/splash' ? null : '/splash';
+      // Admin da NASA: só o painel (sem onboarding nem check-in).
+      final adminArea = loc == '/admin' || loc.startsWith('/admin/');
+      if (app.isAdmin) return adminArea ? null : '/admin';
+      if (adminArea) return '/home';
       if (!p.onboarded) return loc == '/onboarding' ? null : '/onboarding';
       if (public.contains(loc) || loc == '/splash' || loc == '/onboarding') return '/home';
       return null;
     },
     routes: [
+      // O painel fica fora da moldura com a pera: é uma ferramenta de trabalho.
+      GoRoute(
+        path: '/admin',
+        pageBuilder: (c, s) => page(const AdminDashboardPage()),
+        routes: [
+          GoRoute(
+            path: 'astronaut/:id',
+            pageBuilder: (c, s) => page(AdminUserPage(id: s.pathParameters['id']!)),
+          ),
+        ],
+      ),
       ShellRoute(
         builder: (context, state, child) => AppShell(location: state.matchedLocation, child: child),
         routes: [

@@ -27,6 +27,20 @@ Para usar outro projeto:
   SMTP padrão do Supabase envia poucos e-mails por hora. Para a demo, dá para desligar em
   Authentication → Sign In / Providers → Email → *Confirm email*, ou configurar um SMTP próprio.
 
+## Painel NASA (admin)
+
+Contas listadas em `public.admins` entram direto no painel `/admin` (sem pera, onboarding ou
+check-in). O painel mostra os indicadores da tripulação (ativos, atrasados, em atenção, item 9,
+médias de PHQ-9/GAD-7, adesão, faixas, check-ins por semana, sintomas mais marcados) e a ficha
+de cada astronauta (perfil, estatísticas, alertas, evolução, itens e histórico completo).
+
+1. Rode `supabase/migrations/20261115230000_admin_dashboard.sql` no SQL Editor.
+2. Crie a conta (cadastro no app ou Authentication → Users → Add user).
+3. Troque o e-mail em `supabase/grant_admin.sql` e rode no SQL Editor.
+
+Só o banco decide quem é admin (`public.is_admin()` + RLS, somente leitura); o app não consegue
+se promover.
+
 ## Fluxo
 
 1. Boas-vindas: escolha do idioma (a pera cumprimenta), criar conta ou entrar.
