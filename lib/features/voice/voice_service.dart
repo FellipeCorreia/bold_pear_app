@@ -164,7 +164,7 @@ class VoiceService {
     var next = gen(0);
     for (var i = 0; i < chunks.length; i++) {
       final path = await next;
-      if (i + 1 < chunks.length) next = gen(i + 1);
+      if (my == _tok && !muted.value && i + 1 < chunks.length) next = gen(i + 1);
       if (my != _tok || muted.value) {
         if (path != null) neural.discard(path);
         if (my == _tok) await _mime(chunks.skip(i).join(' '));
@@ -175,16 +175,26 @@ class VoiceService {
         continue;
       }
       pear.set(talking: true);
-      await _play(path);
+      await _play(path, my);
       neural.discard(path);
     }
     return true;
   }
 
-  Future<void> _play(String path) async {
+  /// `play()` em andamento (preparando o arquivo). Duas chamadas sobrepostas no mesmo
+  /// player travam o audioplayers por 30 s, então quem for parar/tocar espera esta.
+  Future<void>? _starting;
+
+  Future<void> _play(String path, int my) async {
     final done = _playing = Completer<void>();
     try {
-      await _player.play(DeviceFileSource(path));
+      final start = _starting = _player.play(DeviceFileSource(path));
+      try {
+        await start;
+      } finally {
+        if (identical(_starting, start)) _starting = null;
+      }
+      if (my != _tok) return; // cortada enquanto preparava; quem cortou já para o player
       await done.future.timeout(const Duration(seconds: 40));
     } catch (e) {
       debugPrint('VoiceService play failed: $e');
@@ -198,7 +208,14 @@ class VoiceService {
   }
 
   Future<void> _halt() async {
+    neural.cancelPending();
     _finishPlayback();
+    final starting = _starting;
+    if (starting != null) {
+      try {
+        await starting.timeout(const Duration(seconds: 3));
+      } catch (_) {}
+    }
     try {
       await _player.stop();
     } catch (_) {}

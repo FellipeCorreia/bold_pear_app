@@ -109,7 +109,7 @@ class _CheckinPageState extends State<CheckinPage> {
         Align(
           alignment: Alignment.centerLeft,
           child: OutlinedButton.icon(
-            onPressed: c.busy ? null : c.repeat,
+            onPressed: c.busy || talking ? null : c.repeat,
             icon: const Icon(Icons.replay_rounded),
             label: Text(t.ui('repeat')),
           ),

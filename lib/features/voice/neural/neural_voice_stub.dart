@@ -14,6 +14,7 @@ class NeuralVoice {
   bool get ready => false;
   Future<void> init() async {}
   void discard(String path) {}
+  void cancelPending() {}
   Future<String?> synth(
     String text, {
     required String lang,

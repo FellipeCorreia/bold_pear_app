@@ -45,6 +45,12 @@ class NeuralVoice {
   final _pending = <int, Completer<String?>>{};
   int _seq = 0;
 
+  /// Fila do lado de cá: o worker recebe uma frase por vez, assim [cancelPending]
+  /// consegue descartar o que ainda não começou a ser gerado.
+  final _queue = <(int, List<Object?>)>[];
+  int? _inFlight;
+  SendPort? _worker;
+
   bool get ready => status.value == NeuralVoiceStatus.ready;
   String get _modelDir => '${_root!.path}/$_dirName';
 
@@ -55,9 +61,11 @@ class NeuralVoice {
       final marker = File('$_modelDir/.ok');
       if (marker.existsSync() && marker.readAsStringSync() == _version) {
         status.value = NeuralVoiceStatus.ready;
+        _warmUp();
         return;
       }
       await _install(marker);
+      _warmUp();
     } catch (e) {
       debugPrint('NeuralVoice install failed: $e');
       status.value = NeuralVoiceStatus.error;
@@ -91,15 +99,17 @@ class NeuralVoice {
   }) async {
     if (!ready || text.trim().isEmpty) return null;
     try {
-      final w = await (_spawning ??= _spawn());
+      _worker ??= await (_spawning ??= _spawn());
       final id = ++_seq;
       final c = Completer<String?>();
       _pending[id] = c;
-      w.send([id, text, lang, gender]);
+      _queue.add((id, [id, text, lang, gender]));
+      _pump();
       return await c.future.timeout(
         const Duration(seconds: 25),
         onTimeout: () {
           _pending.remove(id);
+          _queue.removeWhere((e) => e.$1 == id);
           return null;
         },
       );
@@ -107,6 +117,34 @@ class NeuralVoice {
       debugPrint('NeuralVoice synth failed: $e');
       return null;
     }
+  }
+
+  /// Descarta as frases pedidas que ainda não começaram (fala cortada).
+  /// A que já está sendo gerada termina, mas o WAV dela é apagado.
+  void cancelPending() {
+    for (final (id, _) in _queue) {
+      _pending.remove(id)?.complete(null);
+    }
+    _queue.clear();
+    final cur = _inFlight;
+    if (cur != null) _pending.remove(cur)?.complete(null);
+  }
+
+  void _pump() {
+    final w = _worker;
+    if (w == null || _inFlight != null || _queue.isEmpty) return;
+    final (id, msg) = _queue.removeAt(0);
+    _inFlight = id;
+    w.send(msg);
+  }
+
+  /// Sobe o worker e carrega o modelo já, para a primeira fala não esperar.
+  void _warmUp() {
+    if (kIsWeb) return;
+    (_spawning ??= _spawn()).then((w) {
+      _worker ??= w;
+      w.send(const ['warmup']);
+    }).catchError((Object e) => debugPrint('NeuralVoice warm-up failed: $e'));
   }
 
   /// Apaga um WAV já tocado.
@@ -125,7 +163,16 @@ class NeuralVoice {
         ready.complete(m);
       } else if (m is List) {
         if (m.length > 2) debugPrint('NeuralVoice worker: ${m[2]}');
-        _pending.remove(m[0] as int)?.complete(m[1] as String?);
+        final id = m[0] as int;
+        final path = m[1] as String?;
+        if (_inFlight == id) _inFlight = null;
+        final c = _pending.remove(id);
+        if (c != null) {
+          c.complete(path);
+        } else if (path != null) {
+          discard(path); // ninguém mais quer esse áudio
+        }
+        _pump();
       }
     });
     await Isolate.spawn(_workerMain, [
@@ -159,7 +206,8 @@ void _workerMain(List<Object?> args) {
       return;
     }
     final req = m as List;
-    final id = req[0] as int;
+    final warm = req.length == 1 && req[0] == 'warmup';
+    final id = warm ? -1 : req[0] as int;
     try {
       if (tts == null) {
         sherpa.initBindings();
@@ -180,6 +228,7 @@ void _workerMain(List<Object?> args) {
           ),
         );
       }
+      if (warm) return;
       final v = _voices[req[3]] ?? _voices['f']!;
       final a = tts!.generateWithConfig(
         text: req[1] as String,
@@ -202,7 +251,7 @@ void _workerMain(List<Object?> args) {
       );
       out.send([id, path]);
     } catch (e) {
-      out.send([id, null, '$e']);
+      if (!warm) out.send([id, null, '$e']);
     }
   });
 }
