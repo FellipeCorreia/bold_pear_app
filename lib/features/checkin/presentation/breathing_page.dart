@@ -54,8 +54,12 @@ class _BreathingPageState extends State<BreathingPage> {
   @override
   void dispose() {
     _alive = false;
-    _app.pear.set(breath: 1);
-    _app.voice.stop();
+    // dispose roda com a árvore travada: notificar listeners (legenda, pera) só depois do frame.
+    final app = _app;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      app.pear.set(breath: 1);
+      app.voice.stop();
+    });
     super.dispose();
   }
 

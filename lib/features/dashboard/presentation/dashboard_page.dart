@@ -25,7 +25,8 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     final app = context.read<AppState>();
-    app.pear.set(expr: 'neutral', breath: 1);
+    // Não notificar listeners durante o build (initState roda dentro do build do pai).
+    WidgetsBinding.instance.addPostFrameCallback((_) => app.pear.set(expr: 'neutral', breath: 1));
     _future = CheckinRepository(app.sb).list();
     _future
         .then((list) {
