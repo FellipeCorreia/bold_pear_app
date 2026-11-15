@@ -14,7 +14,7 @@ import '../features/voice/voice_service.dart';
 class AppState extends ChangeNotifier {
   AppState(this._prefs, this.voice, this.pear) {
     lang = _prefs.getString('lang') ?? 'pt';
-    cc = _prefs.getBool('cc') ?? false;
+    cc = _prefs.getBool('cc') ?? true;
     voice.setMuted(_prefs.getBool('muted') ?? false);
     voice.configure(lang, 'f');
     _sub = sb.auth.onAuthStateChange.listen((d) => _onAuth(d.session));
@@ -32,7 +32,7 @@ class AppState extends ChangeNotifier {
   Session? session;
   Profile? profile;
   late String lang;
-  bool cc = false;
+  bool cc = true;
   bool greeted = false;
   int _authTok = 0;
 
