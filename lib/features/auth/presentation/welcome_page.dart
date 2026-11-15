@@ -38,7 +38,7 @@ class _WelcomePageState extends State<WelcomePage> {
     final app = context.watch<AppState>();
     final t = app.t;
     return PageBody(children: [
-      const TitleText('Idioma · Language · Sprache · Langue · 言語'),
+      const TitleText('Language · Idioma · Sprache · Langue · 言語'),
       LeadText(t.ui('welcomeBody')),
       for (final (code, name) in kLanguages)
         OptionButton(

@@ -3,8 +3,8 @@ import 'app_strings.dart';
 import 'content.dart';
 
 const kLanguages = <(String, String)>[
-  ('pt', 'Português (Brasil)'),
   ('en', 'English'),
+  ('pt', 'Português (Brasil)'),
   ('de', 'Deutsch'),
   ('fr', 'Français'),
   ('ja', '日本語'),

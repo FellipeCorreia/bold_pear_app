@@ -41,10 +41,10 @@ class VoiceService {
   /// Sem voz instalada no idioma: fala simulada e legendas forçadas.
   final ValueNotifier<bool> noVoice = ValueNotifier(false);
 
-  String _lang = 'pt';
   /// Voz da pera silenciada pelo usuário: ela "fala" só pelas legendas.
   final ValueNotifier<bool> muted = ValueNotifier(false);
 
+  String _lang = 'en';
   String _gender = 'f';
   double _pitch = 1.2;
   int _tok = 0;

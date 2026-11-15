@@ -13,7 +13,7 @@ import '../features/voice/voice_service.dart';
 /// Sessão, perfil, idioma e preferências de exibição.
 class AppState extends ChangeNotifier {
   AppState(this._prefs, this.voice, this.pear) {
-    lang = _prefs.getString('lang') ?? 'pt';
+    lang = _prefs.getString('lang') ?? 'en'; // inglês é o idioma principal
     cc = _prefs.getBool('cc') ?? true;
     voice.setMuted(_prefs.getBool('muted') ?? false);
     voice.configure(lang, 'f');
@@ -60,7 +60,7 @@ class AppState extends ChangeNotifier {
     profile = null;
     notifyListeners();
     try {
-      final p = await _profiles.fetchOrCreate(s.user);
+      final p = await _profiles.fetchOrCreate(s.user, language: lang);
       if (my != _authTok) return;
       profile = p;
       if (p.onboarded) {

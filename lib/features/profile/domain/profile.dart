@@ -18,7 +18,7 @@ class Profile {
   factory Profile.fromMap(Map<String, dynamic> m) => Profile(
         id: m['id'] as String,
         displayName: (m['display_name'] as String?) ?? '',
-        language: (m['language'] as String?) ?? 'pt',
+        language: (m['language'] as String?) ?? 'en',
         voiceGender: (m['voice_gender'] as String?) ?? 'f',
         addressForm: (m['address_form'] as String?) ?? 'm',
         onboarded: (m['onboarded'] as bool?) ?? false,
