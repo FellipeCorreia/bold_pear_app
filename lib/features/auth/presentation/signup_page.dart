@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../app/app_state.dart';
 import '../../../core/widgets/ui.dart';
 import 'auth_errors.dart';
+import 'auth_widgets.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -66,12 +67,14 @@ class _SignupPageState extends State<SignupPage> {
   Widget build(BuildContext context) {
     final t = context.watch<AppState>().t;
     return PageBody(children: [
+      const LanguageSwitch(),
       TitleText(t.ui('signupTitle')),
       const SizedBox(height: 8),
       TextField(
         controller: _name,
         textCapitalization: TextCapitalization.words,
         autofillHints: const [AutofillHints.nickname],
+        textInputAction: TextInputAction.next,
         decoration: InputDecoration(labelText: t.ui('name')),
       ),
       const SizedBox(height: 14),
@@ -79,14 +82,15 @@ class _SignupPageState extends State<SignupPage> {
         controller: _email,
         keyboardType: TextInputType.emailAddress,
         autofillHints: const [AutofillHints.email],
+        textInputAction: TextInputAction.next,
         decoration: InputDecoration(labelText: t.ui('email')),
       ),
       const SizedBox(height: 14),
-      TextField(
+      PasswordField(
         controller: _pass,
-        obscureText: true,
-        autofillHints: const [AutofillHints.newPassword],
-        decoration: InputDecoration(labelText: t.ui('password'), helperText: t.ui('passwordHint')),
+        label: t.ui('password'),
+        helper: t.ui('passwordHint'),
+        newPassword: true,
         onSubmitted: (_) => _signup(),
       ),
       const SizedBox(height: 18),
@@ -96,9 +100,7 @@ class _SignupPageState extends State<SignupPage> {
             ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
             : Text(t.ui('signupBtn')),
       ),
-      const SizedBox(height: 8),
-      TextButton(onPressed: () => context.go('/login'), child: Text(t.ui('toLogin'))),
-      TextButton(onPressed: () => context.go('/welcome'), child: Text(t.ui('back'))),
+      AuthAlternative(label: t.ui('toLogin'), icon: Icons.login_rounded, to: '/login'),
     ]);
   }
 }

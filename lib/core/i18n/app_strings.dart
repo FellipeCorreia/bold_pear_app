@@ -53,6 +53,8 @@ const Map<String, Map<String, String>> kUiApp = {
     'neuralReady': 'Voz neural ativa',
     'neuralError': 'Não foi possível preparar a voz neural. Usando a voz do sistema.',
     'neuralWeb': 'Disponível no app para celular.',
+    'showPassword': 'Mostrar senha',
+    'hidePassword': 'Ocultar senha',
   },
   'en': {
     'errExists': 'An account with this email already exists. Try signing in.',
@@ -105,6 +107,8 @@ const Map<String, Map<String, String>> kUiApp = {
     'neuralReady': 'Neural voice active',
     'neuralError': "Couldn't prepare the neural voice. Using the system voice.",
     'neuralWeb': 'Available in the mobile app.',
+    'showPassword': 'Show password',
+    'hidePassword': 'Hide password',
   },
   'de': {
     'errExists': 'Mit dieser E-Mail gibt es bereits ein Konto. Melden Sie sich an.',
@@ -157,6 +161,8 @@ const Map<String, Map<String, String>> kUiApp = {
     'neuralReady': 'Neuronale Stimme aktiv',
     'neuralError': 'Neuronale Stimme nicht verfügbar. Systemstimme wird verwendet.',
     'neuralWeb': 'In der mobilen App verfügbar.',
+    'showPassword': 'Passwort anzeigen',
+    'hidePassword': 'Passwort verbergen',
   },
   'fr': {
     'errExists': 'Un compte existe déjà avec cet e-mail. Essayez de vous connecter.',
@@ -209,6 +215,8 @@ const Map<String, Map<String, String>> kUiApp = {
     'neuralReady': 'Voix neuronale active',
     'neuralError': 'Voix neuronale indisponible. Voix du système utilisée.',
     'neuralWeb': 'Disponible dans l’app mobile.',
+    'showPassword': 'Afficher le mot de passe',
+    'hidePassword': 'Masquer le mot de passe',
   },
   'ja': {
     'errExists': 'このメールアドレスのアカウントはすでにあります。ログインしてください。',
@@ -261,6 +269,8 @@ const Map<String, Map<String, String>> kUiApp = {
     'neuralReady': 'ニューラル音声が有効',
     'neuralError': 'ニューラル音声を準備できませんでした。システム音声を使用します。',
     'neuralWeb': 'モバイルアプリで利用できます。',
+    'showPassword': 'パスワードを表示',
+    'hidePassword': 'パスワードを隠す',
   },
 };
 
