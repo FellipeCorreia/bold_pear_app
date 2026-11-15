@@ -1,3 +1,4 @@
+import 'alert_strings.dart';
 import 'app_strings.dart';
 import 'content.dart';
 
@@ -29,6 +30,13 @@ class L10n {
   }
 
   List<String> uiList(String key) => ((kUiBase[lang] as Map)[key] as List).cast<String>();
+
+  /// Textos do alerta de limite.
+  String alert(String key, {Map<String, String> vars = const {}}) =>
+      f(kAlertStrings[lang]![key] as String, vars: vars);
+
+  /// Rótulos curtos dos sintomas ('phqItems' ou 'gadItems').
+  List<String> alertItems(String key) => (kAlertStrings[lang]![key] as List).cast<String>();
 
   /// Fala da pera.
   String pear(String key) {

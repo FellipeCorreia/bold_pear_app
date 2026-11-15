@@ -5,13 +5,20 @@ import 'package:flutter/foundation.dart';
 import '../../../app/app_state.dart';
 import '../data/checkin_repository.dart';
 import '../domain/checkin.dart';
+import '../domain/score_alert.dart';
 
 enum CheckinSection { phq, difficulty, gad }
 
 enum CheckinStage { idle, running, finished }
 
 class CheckinQuestion {
-  const CheckinQuestion(this.label, this.index, this.count, this.text, this.options);
+  const CheckinQuestion(
+    this.label,
+    this.index,
+    this.count,
+    this.text,
+    this.options,
+  );
   final String label;
   final int index;
   final int count;
@@ -35,6 +42,10 @@ class CheckinController extends ChangeNotifier {
   bool busy = false;
   Checkin? last;
   bool saveFailed = false;
+
+  /// Alertas de limite do último check-in (comparado aos registros anteriores).
+  List<ScoreAlert> alerts = const [];
+  Future<List<Checkin>>? _history;
   int _run = 0;
 
   int get _phqSum => _phq.fold(0, (a, b) => a + (b ?? 0));
@@ -55,7 +66,13 @@ class CheckinController extends ChangeNotifier {
       case CheckinSection.phq:
         return CheckinQuestion('PHQ-9', qi, 9, compose(phq), opts(phq['opts']));
       case CheckinSection.difficulty:
-        return CheckinQuestion('PHQ-9', 0, 1, t.f(phq['diff'] as String), opts(phq['diffOpts']));
+        return CheckinQuestion(
+          'PHQ-9',
+          0,
+          1,
+          t.f(phq['diff'] as String),
+          opts(phq['diffOpts']),
+        );
       case CheckinSection.gad:
         return CheckinQuestion('GAD-7', qi, 7, compose(gad), opts(gad['opts']));
     }
@@ -70,6 +87,11 @@ class CheckinController extends ChangeNotifier {
     qi = 0;
     busy = true;
     saveFailed = false;
+    alerts = const [];
+    // Linha de base buscada já no início, antes de salvar o novo check-in.
+    _history = CheckinRepository(app.sb)
+        .list(limit: AlertEngine.baselineSize)
+        .catchError((_) => const <Checkin>[]);
     stage = CheckinStage.running;
     notifyListeners();
     final t = app.t;
@@ -85,7 +107,8 @@ class CheckinController extends ChangeNotifier {
     notifyListeners();
     final q = current;
     var text = q.text;
-    if (q.index == 0 && section != CheckinSection.difficulty) text = '$text ${app.t.hint(q.options)}';
+    if (q.index == 0 && section != CheckinSection.difficulty)
+      text = '$text ${app.t.hint(q.options)}';
     final concern = section == CheckinSection.phq && qi == 8;
     app.voice.say(text, expr: concern ? 'concern' : 'neutral');
   }
@@ -142,7 +165,9 @@ class CheckinController extends ChangeNotifier {
       gadItems: _gad.map((e) => e ?? 0).toList(),
       phqDifficulty: _difficulty,
     );
+    final history = await (_history ?? Future.value(const <Checkin>[]));
     last = c;
+    alerts = AlertEngine.evaluate(c, history);
     busy = false;
     stage = CheckinStage.finished;
     notifyListeners();
@@ -168,8 +193,18 @@ class CheckinController extends ChangeNotifier {
     }
     final lv = c.level;
     await app.voice.say(
-      t.pear(lv == 'calm' ? 'sumCalm' : lv == 'mid' ? 'sumMid' : 'sumHigh'),
-      expr: lv == 'calm' ? 'happy' : lv == 'high' ? 'concern' : 'neutral',
+      t.pear(
+        lv == 'calm'
+            ? 'sumCalm'
+            : lv == 'mid'
+            ? 'sumMid'
+            : 'sumHigh',
+      ),
+      expr: lv == 'calm'
+          ? 'happy'
+          : lv == 'high'
+          ? 'concern'
+          : 'neutral',
     );
     if (my == _run) app.pear.set(expr: 'neutral');
   }
@@ -177,7 +212,6 @@ class CheckinController extends ChangeNotifier {
   void cancel() {
     _run++;
     app.voice.stop();
-    busy = false;
-    if (stage == CheckinStage.running) stage = CheckinStage.idle;
+    app.pear.set(expr: 'neutral'); // nova linha
   }
 }
