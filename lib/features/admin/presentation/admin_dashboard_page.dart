@@ -24,10 +24,6 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
-  final _search = TextEditingController();
-  var _filter = _Filter.all;
-  var _sort = _Sort.risk;
-
   @override
   void initState() {
     super.initState();
@@ -37,12 +33,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       final c = context.read<AdminController>();
       if (!c.loaded) c.load();
     });
-  }
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
   }
 
   @override
@@ -63,13 +53,49 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           if (c.error != null) return _ErrorView(a: a, onRetry: c.load);
           return const Center(child: CircularProgressIndicator());
         }
-        return _content(context, app, f, a, loc);
+        return CrewOverview(fleet: f, t: app.t, lang: app.lang);
       }(),
     );
   }
+}
 
-  Widget _content(BuildContext context, AppState app, FleetStats f, AdminText a, String loc) {
-    final t = app.t;
+/// Conteúdo do painel (sem carregamento): indicadores, gráficos e lista da tripulação.
+class CrewOverview extends StatefulWidget {
+  const CrewOverview({super.key, required this.fleet, required this.t, required this.lang});
+  final FleetStats fleet;
+  final L10n t;
+  final String lang;
+
+  @override
+  State<CrewOverview> createState() => _CrewOverviewState();
+}
+
+class _CrewOverviewState extends State<CrewOverview> {
+  final _search = TextEditingController();
+  var _filter = _Filter.all;
+  var _sort = _Sort.risk;
+
+  /// Linhas visíveis da tripulação: renderizar centenas de uma vez trava o celular.
+  static const _pageSize = 50;
+  var _visible = _pageSize;
+
+  void _update(VoidCallback change) => setState(() {
+        change();
+        _visible = _pageSize; // nova busca/filtro/ordem volta para o topo da lista
+      });
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final f = widget.fleet;
+    final t = widget.t;
+    final a = AdminText(widget.lang);
+    final loc = kAdminLocales[widget.lang]!;
     final pct = f.total == 0 ? 0 : (100 * f.active / f.total).round();
     final df = DateFormat.MMMd(loc);
     final langName = {for (final (k, v) in kLanguages) k: v};
@@ -248,7 +274,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         TextField(
           controller: _search,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => _update(() {}),
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.search_rounded),
             hintText: a('search'),
@@ -266,7 +292,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ChoiceChip(
               label: Text(a(key)),
               selected: _filter == fl,
-              onSelected: (_) => setState(() => _filter = fl),
+              onSelected: (_) => _update(() => _filter = fl),
             ),
           const SizedBox(width: 8),
           Text(a('sortBy'), style: const TextStyle(color: PiCores.textoSuave, fontWeight: FontWeight.w700)),
@@ -274,7 +300,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             value: _sort,
             underline: const SizedBox.shrink(),
             borderRadius: BorderRadius.circular(12),
-            onChanged: (v) => setState(() => _sort = v ?? _sort),
+            onChanged: (v) => _update(() => _sort = v ?? _sort),
             items: [
               for (final (s, key) in [
                 (_Sort.risk, 'sRisk'),
@@ -297,7 +323,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             final wide = box.maxWidth >= 860;
             return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               if (wide) _CrewHeader(a: a),
-              for (final x in list) _CrewRow(x: x, a: a, wide: wide, locale: loc),
+              for (final x in list.take(_visible)) _CrewRow(x: x, a: a, wide: wide, locale: loc),
+              if (list.length > _visible)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Center(
+                    child: OutlinedButton.icon(
+                      onPressed: () => setState(() => _visible += _pageSize),
+                      icon: const Icon(Icons.expand_more_rounded),
+                      label: Text(a('showMore', {'n': '${list.length - _visible}'})),
+                    ),
+                  ),
+                ),
             ]);
           }),
       ]),

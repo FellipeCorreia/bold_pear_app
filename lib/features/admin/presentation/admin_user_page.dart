@@ -58,20 +58,22 @@ class _AdminUserPageState extends State<AdminUserPage> {
                   ? Text(a(c.error != null ? 'errorLoad' : 'notFound'), style: const TextStyle(fontWeight: FontWeight.w700))
                   : const CircularProgressIndicator(),
             )
-          : _Body(x: x, a: a, t: app.t, loc: loc),
+          : AstronautView(x: x, t: app.t, lang: app.lang),
     );
   }
 }
 
-class _Body extends StatelessWidget {
-  const _Body({required this.x, required this.a, required this.t, required this.loc});
+/// Conteúdo da ficha (sem carregamento).
+class AstronautView extends StatelessWidget {
+  const AstronautView({super.key, required this.x, required this.t, required this.lang});
   final Astronaut x;
-  final AdminText a;
   final L10n t;
-  final String loc;
+  final String lang;
 
   @override
   Widget build(BuildContext context) {
+    final a = AdminText(lang);
+    final loc = kAdminLocales[lang]!;
     final l = x.last;
     final dfLong = DateFormat.yMMMd(loc).add_Hm();
     final dfDay = DateFormat.yMMMd(loc);

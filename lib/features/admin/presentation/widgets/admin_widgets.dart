@@ -156,7 +156,12 @@ class RiskChip extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Container(width: 8, height: 8, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
         const SizedBox(width: 6),
-        Text(riskLabel(risk, a), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: c)),
+        Flexible(
+          child: Text(riskLabel(risk, a),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: c)),
+        ),
       ]),
     );
   }
@@ -227,21 +232,35 @@ class WeeklyBars extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 3),
                 child: Column(children: [
                   Expanded(
-                    child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                      Text(weeks[i].count == 0 ? '' : '${weeks[i].count}',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 3),
-                      FractionallySizedBox(
-                        widthFactor: 1,
-                        child: Container(
-                          height: math.max(3, 120 * weeks[i].count / peak),
+                    // O número fica numa faixa fixa e encolhe para caber em colunas estreitas
+                    // (celular, contagens com 3+ dígitos); a barra usa o resto da altura.
+                    child: LayoutBuilder(builder: (context, box) {
+                      const labelH = 16.0;
+                      final barMax = math.max(3.0, box.maxHeight - labelH - 3);
+                      return Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                        SizedBox(
+                          height: labelH,
+                          width: double.infinity,
+                          child: weeks[i].count == 0
+                              ? null
+                              : FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.bottomCenter,
+                                  child: Text('${weeks[i].count}',
+                                      maxLines: 1, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                                ),
+                        ),
+                        const SizedBox(height: 3),
+                        Container(
+                          width: double.infinity,
+                          height: math.max(3, barMax * weeks[i].count / peak),
                           decoration: BoxDecoration(
                             color: i == weeks.length - 1 ? PiCores.lima : PiCores.lima.withValues(alpha: .55),
                             borderRadius: BorderRadius.circular(5),
                           ),
                         ),
-                      ),
-                    ]),
+                      ]);
+                    }),
                   ),
                   const SizedBox(height: 6),
                   SizedBox(

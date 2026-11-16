@@ -162,11 +162,14 @@ class FleetStats {
     for (var i = weeksShown - 1; i >= 0; i--) {
       weeks.add(WeekBucket(thisWeek.subtract(Duration(days: 7 * i))));
     }
+    // Índice da semana pela contagem de dias (UTC sobre a data local): evita criar
+    // um DateTime local por check-in, que é lento, e não sofre com horário de verão.
+    final firstDay = _dayNumber(weeks.first.start);
     for (final a in crew) {
       for (final c in a.checkins) {
-        final w = weekStart(c.createdAt);
-        final idx = weeks.indexWhere((b) => b.start == w);
-        if (idx < 0) continue;
+        if (c.createdAt.isBefore(weeks.first.start)) break; // lista vem do mais recente
+        final idx = (_dayNumber(c.createdAt) - firstDay) ~/ 7;
+        if (idx < 0 || idx >= weeks.length) continue;
         final b = weeks[idx];
         b.count++;
         b._phq += c.phqTotal;
@@ -185,6 +188,8 @@ class FleetStats {
   final phqItemMeans = List<double>.filled(9, 0);
   final gadItemMeans = List<double>.filled(7, 0);
   final weeks = <WeekBucket>[];
+
+  static int _dayNumber(DateTime d) => DateTime.utc(d.year, d.month, d.day).millisecondsSinceEpoch ~/ 86400000;
 
   static DateTime weekStart(DateTime d) => DateTime(d.year, d.month, d.day).subtract(Duration(days: d.weekday - 1));
 
