@@ -164,7 +164,16 @@ class _NeuralVoiceTile extends StatelessWidget {
               ]),
             );
           case NeuralVoiceStatus.error:
-            action = Text(t.ui('neuralError'), style: const TextStyle(color: PiCores.bochecha, fontWeight: FontWeight.w700));
+            action = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text(t.ui('neuralError'), style: const TextStyle(color: PiCores.bochecha, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+              // Quem pulou o download na primeira abertura pode baixar a voz por aqui.
+              OutlinedButton.icon(
+                onPressed: n.retry,
+                icon: const Icon(Icons.download_rounded),
+                label: Text(t.ui('neuralRetry')),
+              ),
+            ]);
           case NeuralVoiceStatus.ready:
             action = Row(children: [
               const Icon(Icons.check_circle_rounded, color: PiCores.lima),

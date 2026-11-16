@@ -9,6 +9,7 @@ import '../features/admin/data/admin_repository.dart';
 import '../features/avatar/pear_controller.dart';
 import '../features/profile/data/profile_repository.dart';
 import '../features/profile/domain/profile.dart';
+import '../features/voice/neural/neural_voice.dart';
 import '../features/voice/voice_service.dart';
 
 /// Sessão, perfil, idioma e preferências de exibição.
@@ -16,6 +17,9 @@ class AppState extends ChangeNotifier {
   AppState(this._prefs, this.voice, this.pear) {
     lang = _prefs.getString('lang') ?? 'en'; // inglês é o idioma principal
     cc = _prefs.getBool('cc') ?? true;
+    voiceSkipped = _prefs.getBool('voiceSkipped') ?? false;
+    // Rotas reagem ao download da voz (tela de carregamento → idiomas).
+    voice.neural.status.addListener(notifyListeners);
     voice.setMuted(_prefs.getBool('muted') ?? false);
     voice.configure(lang, 'f');
     _sub = sb.auth.onAuthStateChange.listen((d) => _onAuth(d.session));
@@ -36,11 +40,27 @@ class AppState extends ChangeNotifier {
   bool cc = true;
   bool greeted = false;
 
+  /// A pessoa preferiu seguir com a voz do sistema depois de uma falha no download.
+  bool voiceSkipped = false;
+
   /// Conta da equipe NASA (tabela public.admins): vê o painel em vez do check-in.
   bool isAdmin = false;
   int _authTok = 0;
 
   bool get loggedIn => session != null;
+
+  /// Primeira abertura: a voz neural ainda está sendo baixada (ou falhou e ninguém pulou).
+  bool get needsVoiceSetup {
+    final st = voice.neural.status.value;
+    return !voiceSkipped && st != NeuralVoiceStatus.ready && st != NeuralVoiceStatus.unsupported;
+  }
+
+  /// Segue com a voz do sistema; o download pode ser retomado depois em Ajustes.
+  void skipVoiceSetup() {
+    voiceSkipped = true;
+    _prefs.setBool('voiceSkipped', true);
+    notifyListeners();
+  }
 
   L10n get t => L10n(
         lang,

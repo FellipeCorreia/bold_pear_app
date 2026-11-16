@@ -11,8 +11,13 @@ class NeuralVoice {
   );
   final ValueNotifier<double> progress = ValueNotifier(0);
 
+  static const int totalBytes = 0;
+  int downloadedBytes = 0;
+  Object? lastError;
+
   bool get ready => false;
   Future<void> init() async {}
+  Future<void> retry() async {}
   void discard(String path) {}
   void cancelPending() {}
   Future<String?> synth(

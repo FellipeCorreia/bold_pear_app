@@ -2,45 +2,57 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
+import '../../../core/config/env.dart';
 import 'neural_voice_status.dart';
 
 export 'neural_voice_status.dart';
 
 /// Voz neural offline da Bold Pear: Supertonic 3 (31 idiomas, OpenRAIL-M) via sherpa-onnx.
 ///
-/// O modelo vem embutido no app (assets/voice/supertonic3). Como o sherpa precisa de
-/// arquivos em disco (e no Android os assets ficam compactados no APK), na primeira
-/// abertura ele é copiado para o armazenamento interno, em segundo plano. Enquanto isso
-/// a pera usa a voz do sistema.
+/// O modelo (~138 MB) não vai dentro do app: é baixado na primeira abertura, direto para o
+/// armazenamento interno, arquivo por arquivo. O download retoma de onde parou se a conexão
+/// cair, e cada arquivo é conferido (tamanho + SHA-256) antes de a voz ser ativada.
+/// Enquanto isso (ou se falhar) a pera usa a voz do sistema.
 ///
 /// A síntese roda num isolate próprio para não travar as animações. O tom fica
 /// "de personagem" com um truque barato: gera um pouco mais devagar e grava o WAV
 /// com sample rate maior (pitch sobe, ritmo volta ao normal).
 class NeuralVoice {
-  static const _assetDir = 'assets/voice/supertonic3';
   static const _dirName = 'supertonic-3-int8';
   static const _version = 'supertonic3-int8-2026-05-11';
 
-  /// Arquivos do modelo e tamanho aproximado (MB), para a barra de progresso.
+  /// Arquivos do modelo, como publicados pelo sherpa-onnx (revisão fixada em [Env.voiceModelUrl]).
   static const _files = {
-    'vector_estimator.int8.onnx': 78,
-    'text_encoder.int8.onnx': 36,
-    'vocoder.int8.onnx': 26,
-    'duration_predictor.int8.onnx': 4,
-    'voice.bin': 1,
-    'unicode_indexer.bin': 1,
-    'tts.json': 1,
+    'vector_estimator.int8.onnx': (bytes: 78400833, sha256: '20cd86fa5c6effedfda0e7cffe5b0569ca401c440a0c3a1d72bf39286c0db3fd'),
+    'text_encoder.int8.onnx': (bytes: 36416150, sha256: 'c7befd5ea8c3119769e8a6c1486c4edc6a3bc8365c67621c881bbb774b9902ff'),
+    'vocoder.int8.onnx': (bytes: 25991073, sha256: 'e923d60f53f95eb1ce235f1dc33ec56d9c057823c96fa6f8acf98f32b0da6152'),
+    'duration_predictor.int8.onnx': (bytes: 3700147, sha256: 'c3eb91414d5ff8a7a239b7fe9e34e7e2bf8a8140d8375ffb14718b1c639325db'),
+    'voice.bin': (bytes: 517168, sha256: '67d5209b0ee8ce6c74105ffbe12fe6a7628aea3b4ba2fcb308a4a67938a93ce8'),
+    'unicode_indexer.bin': (bytes: 262144, sha256: '8402ca48e5189a8950138580b0fff64db6f072f24ac07cd54ba8b2fbb9883b30'),
+    'tts.json': (bytes: 8253, sha256: '42078d3aef1cd43ab43021f3c54f47d2d75ceb4e75f627f118890128b06a0d09'),
   };
 
+  /// Tamanho total do download, em bytes.
+  static final int totalBytes = _files.values.fold(0, (a, f) => a + f.bytes);
+
   final ValueNotifier<NeuralVoiceStatus> status = ValueNotifier(NeuralVoiceStatus.absent);
+
+  /// Fração baixada (0–1).
   final ValueNotifier<double> progress = ValueNotifier(0);
 
+  /// Bytes já no disco (para mostrar "x de y MB").
+  int downloadedBytes = 0;
+
+  /// Motivo da última falha (para diagnóstico).
+  Object? lastError;
+
   Directory? _root;
+  Future<void>? _installing;
   Future<SendPort>? _spawning;
   final _pending = <int, Completer<String?>>{};
   int _seq = 0;
@@ -54,40 +66,119 @@ class NeuralVoice {
   bool get ready => status.value == NeuralVoiceStatus.ready;
   String get _modelDir => '${_root!.path}/$_dirName';
 
-  /// Deixa a voz pronta: usa a cópia já instalada ou instala a partir dos assets.
-  Future<void> init() async {
+  /// Deixa a voz pronta: usa a cópia já instalada ou baixa o modelo.
+  Future<void> init() => _installing ??= _init().whenComplete(() => _installing = null);
+
+  /// Tenta de novo depois de uma falha (ex.: sem internet). Retoma o que já veio.
+  Future<void> retry() => init();
+
+  Future<void> _init() async {
     try {
-      _root = Directory('${(await getApplicationSupportDirectory()).path}/voices');
+      _root ??= Directory('${(await getApplicationSupportDirectory()).path}/voices');
       final marker = File('$_modelDir/.ok');
       if (marker.existsSync() && marker.readAsStringSync() == _version) {
         status.value = NeuralVoiceStatus.ready;
         _warmUp();
         return;
       }
-      await _install(marker);
+      await _download(marker);
       _warmUp();
     } catch (e) {
-      debugPrint('NeuralVoice install failed: $e');
+      debugPrint('NeuralVoice download failed: $e');
+      lastError = e;
       status.value = NeuralVoiceStatus.error;
     }
   }
 
-  Future<void> _install(File marker) async {
+  Future<void> _download(File marker) async {
     status.value = NeuralVoiceStatus.installing;
-    progress.value = 0;
-    final dir = Directory(_modelDir);
-    if (dir.existsSync()) dir.deleteSync(recursive: true);
-    dir.createSync(recursive: true);
-    final total = _files.values.reduce((a, b) => a + b);
-    var done = 0;
-    for (final MapEntry(key: name, value: mb) in _files.entries) {
-      final data = await rootBundle.load('$_assetDir/$name');
-      await File('${dir.path}/$name').writeAsBytes(data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes), flush: true);
-      done += mb;
-      progress.value = done / total;
+    final dir = Directory(_modelDir)..createSync(recursive: true);
+    final http = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 20)
+      ..idleTimeout = const Duration(seconds: 30)
+      ..userAgent = 'BoldPear';
+    try {
+      var done = 0;
+      void report(int current) {
+        downloadedBytes = done + current;
+        progress.value = downloadedBytes / totalBytes;
+      }
+
+      for (final MapEntry(key: name, value: spec) in _files.entries) {
+        final file = File('${dir.path}/$name');
+        // Já baixado e conferido numa tentativa anterior: pula.
+        final ok = file.existsSync() && file.lengthSync() == spec.bytes && await _sha256(file) == spec.sha256;
+        if (!ok) {
+          await fetchFile(http, '${Env.voiceModelUrl}/$name', file, spec.bytes, report);
+          if (await _sha256(file) != spec.sha256) {
+            file.deleteSync();
+            throw StateError('checksum mismatch: $name');
+          }
+        }
+        done += spec.bytes;
+        report(0);
+      }
+      marker.writeAsStringSync(_version);
+      status.value = NeuralVoiceStatus.ready;
+    } finally {
+      http.close(force: true);
     }
-    marker.writeAsStringSync(_version);
-    status.value = NeuralVoiceStatus.ready;
+  }
+
+  /// Baixa [url] para [dest] via um `.part`, retomando (HTTP Range) o que já veio.
+  @visibleForTesting
+  static Future<void> fetchFile(HttpClient http, String url, File dest, int size, void Function(int) report) async {
+    final part = File('${dest.path}.part');
+    var have = part.existsSync() ? part.lengthSync() : 0;
+    if (have > size) {
+      part.deleteSync();
+      have = 0;
+    }
+    report(have);
+    if (have < size) {
+      // Redirecionamentos na mão: o Hugging Face manda para a CDN e o Range precisa ir junto.
+      var uri = Uri.parse(url);
+      HttpClientResponse res;
+      for (var hops = 0;; hops++) {
+        final req = await http.getUrl(uri);
+        req.followRedirects = false;
+        if (have > 0) req.headers.set(HttpHeaders.rangeHeader, 'bytes=$have-');
+        res = await req.close();
+        if (!res.isRedirect) break;
+        await res.drain<void>();
+        final loc = res.headers.value(HttpHeaders.locationHeader);
+        if (loc == null || hops >= 5) throw HttpException('too many redirects', uri: uri);
+        uri = uri.resolve(loc);
+      }
+      if (res.statusCode == HttpStatus.ok) {
+        have = 0; // o servidor ignorou o Range: recomeça do zero
+      } else if (res.statusCode != HttpStatus.partialContent) {
+        await res.drain<void>();
+        throw HttpException('HTTP ${res.statusCode}', uri: uri);
+      }
+      final sink = part.openWrite(mode: have == 0 ? FileMode.write : FileMode.append);
+      try {
+        await for (final chunk in res.timeout(const Duration(seconds: 30))) {
+          sink.add(chunk);
+          have += chunk.length;
+          report(have);
+        }
+      } finally {
+        await sink.close();
+      }
+    }
+    if (part.lengthSync() != size) throw StateError('incomplete download: ${dest.path}');
+    if (dest.existsSync()) dest.deleteSync();
+    part.renameSync(dest.path);
+  }
+
+  /// SHA-256 do arquivo, calculado fora da thread de UI.
+  @visibleForTesting
+  static Future<String> sha256Of(File f) => _sha256(f);
+
+  static Future<String> _sha256(File f) {
+    final path = f.path;
+    return Isolate.run(() async => (await sha256.bind(File(path).openRead()).first).toString());
   }
 
   /// Sintetiza [text] e devolve o caminho de um WAV temporário (ou null em falha).

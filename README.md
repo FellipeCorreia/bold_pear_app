@@ -50,8 +50,19 @@ check-ins, paginação da API, casos graves e telas em celular e desktop).
 Só o banco decide quem é admin (`public.is_admin()` + RLS, somente leitura); o app não consegue
 se promover.
 
+## Voz neural
+
+A voz da pera (Supertonic 3 int8 via sherpa-onnx, OpenRAIL-M, ~138 MB) **não vai no app nem
+no repositório**: é baixada na primeira abertura, numa tela de carregamento antes da escolha
+de idioma. Os arquivos vêm do espelho do sherpa-onnx no Hugging Face, numa revisão fixada
+(`Env.voiceModelUrl`); cada um é conferido por tamanho e SHA-256, e o download retoma de onde
+parou se a conexão cair. Se falhar, dá para tentar de novo ou seguir com a voz do sistema
+(e baixar depois em Ajustes). Na web, usa a voz do navegador. Outra origem:
+`--dart-define=VOICE_MODEL_URL=https://.../pasta`.
+
 ## Fluxo
 
+0. Primeira abertura (celular): download da voz da pera, com barra de progresso.
 1. Boas-vindas: escolha do idioma (a pera cumprimenta), criar conta ou entrar.
 2. Cadastro (nome, e-mail, senha) ou login; recuperação de senha por e-mail.
 3. Primeiro acesso: a pera avisa que é só um programa e que ninguém ouve ao vivo; escolha da voz
