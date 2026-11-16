@@ -36,7 +36,16 @@ de cada astronauta (perfil, estatísticas, alertas, evolução, itens e históri
 
 1. Rode `supabase/migrations/20261115230000_admin_dashboard.sql` no SQL Editor.
 2. Crie a conta (cadastro no app ou Authentication → Users → Add user).
-3. Troque o e-mail em `supabase/grant_admin.sql` e rode no SQL Editor.
+3. Troque o e-mail em `supabase/grant_admin.sql` e rode no SQL Editor — ou, sem abrir o painel
+   do Supabase, com um [token pessoal](https://supabase.com/dashboard/account/tokens):
+   ```bash
+   SUPABASE_ACCESS_TOKEN=sbp_... python scripts/grant_admin.py admin@exemplo.com   # concede
+   python scripts/grant_admin.py --revoke admin@exemplo.com                        # remove
+   python scripts/grant_admin.py --list                                            # lista
+   ```
+
+Testes do painel: `flutter test test/admin_load_test.dart` (1.000 astronautas / ~15 mil
+check-ins, paginação da API, casos graves e telas em celular e desktop).
 
 Só o banco decide quem é admin (`public.is_admin()` + RLS, somente leitura); o app não consegue
 se promover.
