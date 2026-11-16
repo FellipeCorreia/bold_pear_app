@@ -1,6 +1,8 @@
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../features/admin/presentation/admin_dashboard_page.dart';
+import '../features/admin/presentation/admin_user_page.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/signup_page.dart';
 import '../features/auth/presentation/welcome_page.dart';
@@ -10,6 +12,7 @@ import '../features/checkin/presentation/results_page.dart';
 import '../features/dashboard/presentation/dashboard_page.dart';
 import '../features/profile/presentation/onboarding_page.dart';
 import '../features/profile/presentation/settings_page.dart';
+import '../features/voice/presentation/voice_setup_page.dart';
 import 'app_state.dart';
 import 'shell.dart';
 
@@ -23,18 +26,37 @@ GoRouter buildRouter(AppState app) {
     redirect: (context, state) {
       final loc = state.matchedLocation;
       if (!app.ready) return loc == '/splash' ? null : '/splash';
+      // Primeira abertura: baixa a voz da pera antes de escolher o idioma (admins não precisam).
+      if (app.needsVoiceSetup && !app.isAdmin) return loc == '/voice-setup' ? null : '/voice-setup';
+      if (loc == '/voice-setup') return app.loggedIn ? '/home' : '/welcome';
       if (!app.loggedIn) return public.contains(loc) ? null : '/welcome';
       final p = app.profile;
       if (p == null) return loc == '/splash' ? null : '/splash';
+      // Admin da NASA: só o painel (sem onboarding nem check-in).
+      final adminArea = loc == '/admin' || loc.startsWith('/admin/');
+      if (app.isAdmin) return adminArea ? null : '/admin';
+      if (adminArea) return '/home';
       if (!p.onboarded) return loc == '/onboarding' ? null : '/onboarding';
       if (public.contains(loc) || loc == '/splash' || loc == '/onboarding') return '/home';
       return null;
     },
     routes: [
+      // O painel fica fora da moldura com a pera: é uma ferramenta de trabalho.
+      GoRoute(
+        path: '/admin',
+        pageBuilder: (c, s) => page(const AdminDashboardPage()),
+        routes: [
+          GoRoute(
+            path: 'astronaut/:id',
+            pageBuilder: (c, s) => page(AdminUserPage(id: s.pathParameters['id']!)),
+          ),
+        ],
+      ),
       ShellRoute(
         builder: (context, state, child) => AppShell(location: state.matchedLocation, child: child),
         routes: [
           GoRoute(path: '/splash', pageBuilder: (c, s) => page(const _Splash())),
+          GoRoute(path: '/voice-setup', pageBuilder: (c, s) => page(const VoiceSetupPage())),
           GoRoute(path: '/welcome', pageBuilder: (c, s) => page(const WelcomePage())),
           GoRoute(path: '/login', pageBuilder: (c, s) => page(const LoginPage())),
           GoRoute(path: '/signup', pageBuilder: (c, s) => page(const SignupPage())),

@@ -7,6 +7,7 @@ import '../../../core/theme/pi_cores.dart';
 import '../../../core/widgets/ui.dart';
 import '../domain/checkin.dart';
 import 'checkin_controller.dart';
+import 'widgets/alert_panel.dart';
 import 'widgets/score_meter.dart';
 
 class ResultsPage extends StatefulWidget {
@@ -67,6 +68,7 @@ class _ResultsPageState extends State<ResultsPage> {
             ]),
           ),
         ),
+      AlertPanel(alerts: c.alerts, t: t),
       Panel(
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           ScoreMeter(

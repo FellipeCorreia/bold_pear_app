@@ -5,13 +5,20 @@ import 'package:flutter/foundation.dart';
 import '../../../app/app_state.dart';
 import '../data/checkin_repository.dart';
 import '../domain/checkin.dart';
+import '../domain/score_alert.dart';
 
 enum CheckinSection { phq, difficulty, gad }
 
 enum CheckinStage { idle, running, finished }
 
 class CheckinQuestion {
-  const CheckinQuestion(this.label, this.index, this.count, this.text, this.options);
+  const CheckinQuestion(
+    this.label,
+    this.index,
+    this.count,
+    this.text,
+    this.options,
+  );
   final String label;
   final int index;
   final int count;
@@ -35,6 +42,10 @@ class CheckinController extends ChangeNotifier {
   bool busy = false;
   Checkin? last;
   bool saveFailed = false;
+
+  /// Alertas de limite do último check-in (comparado aos registros anteriores).
+  List<ScoreAlert> alerts = const [];
+  Future<List<Checkin>>? _history;
   int _run = 0;
 
   int get _phqSum => _phq.fold(0, (a, b) => a + (b ?? 0));
@@ -55,49 +66,68 @@ class CheckinController extends ChangeNotifier {
       case CheckinSection.phq:
         return CheckinQuestion('PHQ-9', qi, 9, compose(phq), opts(phq['opts']));
       case CheckinSection.difficulty:
-        return CheckinQuestion('PHQ-9', 0, 1, t.f(phq['diff'] as String), opts(phq['diffOpts']));
+        return CheckinQuestion(
+          'PHQ-9',
+          0,
+          1,
+          t.f(phq['diff'] as String),
+          opts(phq['diffOpts']),
+        );
       case CheckinSection.gad:
         return CheckinQuestion('GAD-7', qi, 7, compose(gad), opts(gad['opts']));
     }
   }
 
   Future<void> start() async {
-    final my = ++_run;
+    ++_run;
     _phq = List.filled(9, null);
     _gad = List.filled(7, null);
     _difficulty = null;
     section = CheckinSection.phq;
     qi = 0;
-    busy = true;
+    busy = false;
     saveFailed = false;
+    alerts = const [];
+    _lastAnswer = null;
+    // Linha de base buscada já no início, antes de salvar o novo check-in.
+    _history = CheckinRepository(app.sb)
+        .list(limit: AlertEngine.baselineSize)
+        .catchError((_) => const <Checkin>[]);
     stage = CheckinStage.running;
     notifyListeners();
     final t = app.t;
-    await app.voice.say(t.pear('intro'), expr: 'happy');
-    if (my != _run) return;
-    await app.voice.say(t.pear('phqIntro'), expr: 'neutral');
-    if (my != _run) return;
-    _ask();
+    // Intro + primeira pergunta numa fala só: as opções já ficam liberadas e,
+    // se a pessoa responder antes, a fala é cortada.
+    _ask(lead: '${t.pear('intro')} ${t.pear('phqIntro')}');
   }
 
-  void _ask() {
-    busy = false;
-    notifyListeners();
+  /// Fala a pergunta atual (com uma frase antes, se houver). Não bloqueia as respostas.
+  void _ask({String? lead}) {
     final q = current;
     var text = q.text;
-    if (q.index == 0 && section != CheckinSection.difficulty) text = '$text ${app.t.hint(q.options)}';
+    if (q.index == 0 && section != CheckinSection.difficulty) {
+      text = '$text ${app.t.hint(q.options)}';
+    }
+    if (lead != null && lead.isNotEmpty) text = '$lead $text';
     final concern = section == CheckinSection.phq && qi == 8;
     app.voice.say(text, expr: concern ? 'concern' : 'neutral');
   }
 
   void repeat() {
-    if (!busy && stage == CheckinStage.running) _ask();
+    if (stage == CheckinStage.running) _ask();
   }
 
-  Future<void> answer(int k) async {
+  DateTime? _lastAnswer;
+
+  /// Responde a pergunta atual a qualquer momento: corta a fala e vai para a próxima.
+  void answer(int k) {
     if (busy || stage != CheckinStage.running) return;
-    busy = true;
-    await app.voice.stop();
+    // Evita que um toque duplo acidental pule uma pergunta.
+    final now = DateTime.now();
+    final prev = _lastAnswer;
+    if (prev != null && now.difference(prev) < const Duration(milliseconds: 350)) return;
+    _lastAnswer = now;
+    ++_run;
     final t = app.t;
     final acks = t.acks;
     var line = acks[_rnd.nextInt(acks.length)];
@@ -124,14 +154,14 @@ class CheckinController extends ChangeNotifier {
         if (qi < 6) {
           qi++;
         } else {
-          return _finish();
+          busy = true;
+          app.voice.stop();
+          _finish();
+          return;
         }
     }
     notifyListeners();
-    final my = _run;
-    await app.voice.say(line, expr: 'happy');
-    if (my != _run) return;
-    _ask();
+    _ask(lead: line);
   }
 
   Future<void> _finish() async {
@@ -142,7 +172,9 @@ class CheckinController extends ChangeNotifier {
       gadItems: _gad.map((e) => e ?? 0).toList(),
       phqDifficulty: _difficulty,
     );
+    final history = await (_history ?? Future.value(const <Checkin>[]));
     last = c;
+    alerts = AlertEngine.evaluate(c, history);
     busy = false;
     stage = CheckinStage.finished;
     notifyListeners();
@@ -168,8 +200,18 @@ class CheckinController extends ChangeNotifier {
     }
     final lv = c.level;
     await app.voice.say(
-      t.pear(lv == 'calm' ? 'sumCalm' : lv == 'mid' ? 'sumMid' : 'sumHigh'),
-      expr: lv == 'calm' ? 'happy' : lv == 'high' ? 'concern' : 'neutral',
+      t.pear(
+        lv == 'calm'
+            ? 'sumCalm'
+            : lv == 'mid'
+            ? 'sumMid'
+            : 'sumHigh',
+      ),
+      expr: lv == 'calm'
+          ? 'happy'
+          : lv == 'high'
+          ? 'concern'
+          : 'neutral',
     );
     if (my == _run) app.pear.set(expr: 'neutral');
   }
@@ -177,7 +219,6 @@ class CheckinController extends ChangeNotifier {
   void cancel() {
     _run++;
     app.voice.stop();
-    busy = false;
-    if (stage == CheckinStage.running) stage = CheckinStage.idle;
+    app.pear.set(expr: 'neutral'); // nova linha
   }
 }

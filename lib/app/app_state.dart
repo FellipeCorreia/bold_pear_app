@@ -5,16 +5,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/i18n/l10n.dart';
+import '../features/admin/data/admin_repository.dart';
 import '../features/avatar/pear_controller.dart';
 import '../features/profile/data/profile_repository.dart';
 import '../features/profile/domain/profile.dart';
+import '../features/voice/neural/neural_voice.dart';
 import '../features/voice/voice_service.dart';
 
 /// Sessão, perfil, idioma e preferências de exibição.
 class AppState extends ChangeNotifier {
   AppState(this._prefs, this.voice, this.pear) {
-    lang = _prefs.getString('lang') ?? 'pt';
-    cc = _prefs.getBool('cc') ?? false;
+    lang = _prefs.getString('lang') ?? 'en'; // inglês é o idioma principal
+    cc = _prefs.getBool('cc') ?? true;
+    voiceSkipped = _prefs.getBool('voiceSkipped') ?? false;
+    // Rotas reagem ao download da voz (tela de carregamento → idiomas).
+    voice.neural.status.addListener(notifyListeners);
+    voice.setMuted(_prefs.getBool('muted') ?? false);
     voice.configure(lang, 'f');
     _sub = sb.auth.onAuthStateChange.listen((d) => _onAuth(d.session));
     _onAuth(sb.auth.currentSession);
@@ -31,11 +37,30 @@ class AppState extends ChangeNotifier {
   Session? session;
   Profile? profile;
   late String lang;
-  bool cc = false;
+  bool cc = true;
   bool greeted = false;
+
+  /// A pessoa preferiu seguir com a voz do sistema depois de uma falha no download.
+  bool voiceSkipped = false;
+
+  /// Conta da equipe NASA (tabela public.admins): vê o painel em vez do check-in.
+  bool isAdmin = false;
   int _authTok = 0;
 
   bool get loggedIn => session != null;
+
+  /// Primeira abertura: a voz neural ainda está sendo baixada (ou falhou e ninguém pulou).
+  bool get needsVoiceSetup {
+    final st = voice.neural.status.value;
+    return !voiceSkipped && st != NeuralVoiceStatus.ready && st != NeuralVoiceStatus.unsupported;
+  }
+
+  /// Segue com a voz do sistema; o download pode ser retomado depois em Ajustes.
+  void skipVoiceSetup() {
+    voiceSkipped = true;
+    _prefs.setBool('voiceSkipped', true);
+    notifyListeners();
+  }
 
   L10n get t => L10n(
         lang,
@@ -50,6 +75,7 @@ class AppState extends ChangeNotifier {
     session = s;
     if (s == null) {
       profile = null;
+      isAdmin = false;
       greeted = false;
       ready = true;
       notifyListeners();
@@ -58,9 +84,15 @@ class AppState extends ChangeNotifier {
     if (sameUser) return;
     profile = null;
     notifyListeners();
+    isAdmin = false;
     try {
-      final p = await _profiles.fetchOrCreate(s.user);
+      final results = await Future.wait([
+        _profiles.fetchOrCreate(s.user, language: lang),
+        AdminRepository(sb).isAdmin(),
+      ]);
       if (my != _authTok) return;
+      final p = results[0] as Profile;
+      isAdmin = results[1] as bool;
       profile = p;
       if (p.onboarded) {
         lang = p.language;
@@ -110,6 +142,14 @@ class AppState extends ChangeNotifier {
   void toggleCc() {
     cc = !cc;
     _prefs.setBool('cc', cc);
+    notifyListeners();
+  }
+
+  bool get muted => voice.muted.value;
+
+  void toggleMute() {
+    voice.setMuted(!muted);
+    _prefs.setBool('muted', muted);
     notifyListeners();
   }
 

@@ -27,8 +27,42 @@ Para usar outro projeto:
   SMTP padrão do Supabase envia poucos e-mails por hora. Para a demo, dá para desligar em
   Authentication → Sign In / Providers → Email → *Confirm email*, ou configurar um SMTP próprio.
 
+## Painel NASA (admin)
+
+Contas listadas em `public.admins` entram direto no painel `/admin` (sem pera, onboarding ou
+check-in). O painel mostra os indicadores da tripulação (ativos, atrasados, em atenção, item 9,
+médias de PHQ-9/GAD-7, adesão, faixas, check-ins por semana, sintomas mais marcados) e a ficha
+de cada astronauta (perfil, estatísticas, alertas, evolução, itens e histórico completo).
+
+1. Rode `supabase/migrations/20261115230000_admin_dashboard.sql` no SQL Editor.
+2. Crie a conta (cadastro no app ou Authentication → Users → Add user).
+3. Troque o e-mail em `supabase/grant_admin.sql` e rode no SQL Editor — ou, sem abrir o painel
+   do Supabase, com um [token pessoal](https://supabase.com/dashboard/account/tokens):
+   ```bash
+   SUPABASE_ACCESS_TOKEN=sbp_... python scripts/grant_admin.py admin@exemplo.com   # concede
+   python scripts/grant_admin.py --revoke admin@exemplo.com                        # remove
+   python scripts/grant_admin.py --list                                            # lista
+   ```
+
+Testes do painel: `flutter test test/admin_load_test.dart` (1.000 astronautas / ~15 mil
+check-ins, paginação da API, casos graves e telas em celular e desktop).
+
+Só o banco decide quem é admin (`public.is_admin()` + RLS, somente leitura); o app não consegue
+se promover.
+
+## Voz neural
+
+A voz da pera (Supertonic 3 int8 via sherpa-onnx, OpenRAIL-M, ~138 MB) **não vai no app nem
+no repositório**: é baixada na primeira abertura, numa tela de carregamento antes da escolha
+de idioma. Os arquivos vêm do espelho do sherpa-onnx no Hugging Face, numa revisão fixada
+(`Env.voiceModelUrl`); cada um é conferido por tamanho e SHA-256, e o download retoma de onde
+parou se a conexão cair. Se falhar, dá para tentar de novo ou seguir com a voz do sistema
+(e baixar depois em Ajustes). Na web, usa a voz do navegador. Outra origem:
+`--dart-define=VOICE_MODEL_URL=https://.../pasta`.
+
 ## Fluxo
 
+0. Primeira abertura (celular): download da voz da pera, com barra de progresso.
 1. Boas-vindas: escolha do idioma (a pera cumprimenta), criar conta ou entrar.
 2. Cadastro (nome, e-mail, senha) ou login; recuperação de senha por e-mail.
 3. Primeiro acesso: a pera avisa que é só um programa e que ninguém ouve ao vivo; escolha da voz

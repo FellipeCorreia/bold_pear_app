@@ -50,7 +50,11 @@ class TitleText extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
-        child: Text(text, style: const TextStyle(fontSize: 28, height: 1.12, fontWeight: FontWeight.w900)),
+        // Cabeçalho para leitores de tela (WCAG 1.3.1 / 2.4.6).
+        child: Semantics(
+          header: true,
+          child: Text(text, style: const TextStyle(fontSize: 28, height: 1.12, fontWeight: FontWeight.w900)),
+        ),
       );
 }
 
@@ -83,8 +87,12 @@ class OptionButton extends StatelessWidget {
     this.trailing,
     this.selected = false,
     this.enabled = true,
+    this.locale,
     required this.onTap,
   });
+
+  /// Idioma do rótulo, para o leitor de tela pronunciar certo (WCAG 3.1.2).
+  final Locale? locale;
 
   final String label;
   final String? badge;
@@ -97,7 +105,11 @@ class OptionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Opacity(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        enabled: enabled,
+        child: Opacity(
         opacity: enabled ? 1 : .45,
         child: Material(
           color: selected ? PiCores.limaFundo : PiCores.fundo2,
@@ -114,17 +126,18 @@ class OptionButton extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: Row(children: [
                   if (badge != null) ...[
-                    Container(
+                    // A sigla é só visual; o leitor de tela lê o rótulo completo.
+                    ExcludeSemantics(child: Container(
                       width: 32,
                       height: 32,
                       alignment: Alignment.center,
                       decoration: const BoxDecoration(color: Color(0xFF45454C), shape: BoxShape.circle),
                       child: Text(badge!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-                    ),
+                    )),
                     const SizedBox(width: 14),
                   ],
                   Expanded(
-                      child: Text(label, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
+                      child: Text(label, locale: locale, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800))),
                   if (trailing != null)
                     Text(trailing!,
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: PiCores.textoSuave)),
@@ -133,6 +146,7 @@ class OptionButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

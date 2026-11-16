@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-import '../../core/theme/pi_cores.dart';
 import 'pear_controller.dart';
 
 /// Android/iOS: a pera 3D (three.js, offline) roda numa WebView local.
@@ -24,9 +23,14 @@ class _PearViewState extends State<PearView> {
     super.initState();
     _web = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(PiCores.fundo)
+      ..setBackgroundColor(const Color(0x00000000))
       ..setNavigationDelegate(NavigationDelegate(onPageFinished: (_) {
         _loaded = true;
+        // Garante fundo transparente mesmo se o HTML empacotado for de um build antigo.
+        _web.runJavaScript("document.documentElement.style.setProperty('--bg','transparent');"
+            "document.documentElement.style.background='transparent';document.body.style.background='transparent';"
+            "document.body.style.position='fixed';document.body.style.inset='0';document.body.style.touchAction='none';"
+            "document.addEventListener('touchmove',function(e){e.preventDefault()},{passive:false})");
         _push();
       }))
       ..loadFlutterAsset('assets/avatar/index.html');

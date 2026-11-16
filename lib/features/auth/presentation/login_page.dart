@@ -1,4 +1,3 @@
-import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../app/app_state.dart';
 import '../../../core/widgets/ui.dart';
 import 'auth_errors.dart';
+import 'auth_widgets.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -71,22 +71,18 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final t = context.watch<AppState>().t;
     return PageBody(children: [
+      const LanguageSwitch(),
       TitleText(t.ui('loginTitle')),
       const SizedBox(height: 8),
       TextField(
         controller: _email,
         keyboardType: TextInputType.emailAddress,
         autofillHints: const [AutofillHints.email],
+        textInputAction: TextInputAction.next,
         decoration: InputDecoration(labelText: t.ui('email')),
       ),
       const SizedBox(height: 14),
-      TextField(
-        controller: _pass,
-        obscureText: true,
-        autofillHints: const [AutofillHints.password],
-        decoration: InputDecoration(labelText: t.ui('password')),
-        onSubmitted: (_) => _login(),
-      ),
+      PasswordField(controller: _pass, label: t.ui('password'), onSubmitted: (_) => _login()),
       Align(
         alignment: Alignment.centerRight,
         child: TextButton(onPressed: _forgot, child: Text(t.ui('forgot'))),
@@ -97,9 +93,7 @@ class _LoginPageState extends State<LoginPage> {
             ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
             : Text(t.ui('loginBtn')),
       ),
-      const SizedBox(height: 8),
-      TextButton(onPressed: () => context.go('/signup'), child: Text(t.ui('toSignup'))),
-      TextButton(onPressed: () => context.go('/welcome'), child: Text(t.ui('back'))),
+      AuthAlternative(label: t.ui('toSignup'), icon: Icons.person_add_alt_1_rounded, to: '/signup'),
     ]);
   }
 }

@@ -1,13 +1,24 @@
 import 'package:flutter/foundation.dart';
 
-/// Estado da Bold Pear 3D: expressão, fala, voz (acessórios) e respiração.
+/// Estado da Bold Pear 3D: expressão, fala, voz (acessórios), respiração e reações ao toque.
 class PearController extends ChangeNotifier {
   String expr = 'neutral'; // neutral | happy | concern
   bool talking = false;
   String gender = 'f';
   double breath = 1;
 
-  Map<String, Object> get state => {'expr': expr, 'talking': talking, 'gender': gender, 'breath': breath};
+  /// Cada toque incrementa [poke]; a WebView dispara a animação [react] quando ele muda.
+  int poke = 0;
+  String react = '';
+
+  Map<String, Object> get state =>
+      {'expr': expr, 'talking': talking, 'gender': gender, 'breath': breath, 'poke': poke, 'react': react};
+
+  void reactTo(String reaction) {
+    poke++;
+    react = reaction;
+    notifyListeners();
+  }
 
   void set({String? expr, bool? talking, String? gender, double? breath}) {
     var changed = false;

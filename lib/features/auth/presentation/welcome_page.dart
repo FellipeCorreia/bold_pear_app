@@ -26,11 +26,11 @@ class _WelcomePageState extends State<WelcomePage> {
     }
   }
 
+  /// Escolher o idioma já leva para o login (que tem o atalho para criar conta).
   Future<void> _pickLang(String l) async {
     final app = context.read<AppState>();
     await app.setLang(l);
-    if (!mounted) return;
-    app.voice.say('${app.t.pear('hello')} ${app.t.pear('welcome')}', expr: 'happy');
+    if (mounted) context.go('/login');
   }
 
   @override
@@ -38,19 +38,16 @@ class _WelcomePageState extends State<WelcomePage> {
     final app = context.watch<AppState>();
     final t = app.t;
     return PageBody(children: [
-      const TitleText('Idioma · Language · Sprache · Langue · 言語'),
+      const TitleText('Language · Idioma · Sprache · Langue · 言語'),
       LeadText(t.ui('welcomeBody')),
       for (final (code, name) in kLanguages)
         OptionButton(
           label: name,
           badge: code.toUpperCase(),
           selected: app.lang == code,
+          locale: Locale(code),
           onTap: () => _pickLang(code),
         ),
-      const SizedBox(height: 12),
-      FilledButton(onPressed: () => context.go('/signup'), child: Text(t.ui('createAccount'))),
-      const SizedBox(height: 10),
-      OutlinedButton(onPressed: () => context.go('/login'), child: Text(t.ui('haveAccount'))),
     ]);
   }
 }
